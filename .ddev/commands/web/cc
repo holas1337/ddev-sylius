@@ -1,0 +1,9 @@
+#!/bin/bash
+
+### Doctrine clean cache
+bin/console doctrine:cache:clear-query
+bin/console doctrine:cache:clear-result
+bin/console doctrine:cache:clear-metadata
+
+### Clear cache
+bin/console c:c

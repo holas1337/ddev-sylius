@@ -1,0 +1,29 @@
+#!/bin/bash
+
+RED="\e[31m"
+GREEN="\e[32m"
+ENDCOLOR="\e[0m"
+
+### composer install
+ddev composer install
+
+### run Doctrine migrations
+ddev exec bin/console doctrine:migrations:migrate --no-interaction
+
+### clear all cache
+ddev cc
+
+### lexik keys generate
+ddev exec bin/console lexik:jwt:generate-keypair --skip-if-exists
+
+### build dist
+ddev dist
+
+### Elastic search index
+#ddev exec bin/console fos:elastica:populate
+
+### Check packages security
+ddev security-check
+
+### Show status
+ddev status

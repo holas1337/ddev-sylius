@@ -1,0 +1,17 @@
+#!/bin/bash
+
+RED="\e[31m"
+GREEN="\e[32m"
+ENDCOLOR="\e[0m"
+
+echo -e "Import ${GREEN}database${ENDCOLOR}"
+
+BACKUP_DIR="${DDEV_APPROOT}/.ddev/backup"
+
+if [ -f "${BACKUP_DIR}/database.sql.gz" ]; then
+    ddev import-db --file="${BACKUP_DIR}"/database.sql.gz
+else
+    LAST_DATABASE_BACKUP=$(ls -t "${BACKUP_DIR}"/database_*.sql.gz | head -1)
+    echo -e "No database.sql.gz found, using ${LAST_DATABASE_BACKUP}"
+    ddev import-db --file="${LAST_DATABASE_BACKUP}"
+fi

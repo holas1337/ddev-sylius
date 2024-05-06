@@ -1,0 +1,12 @@
+#!/bin/bash
+
+### Sylius assets install
+bin/console assets:install
+bin/console sylius:install:assets
+bin/console sylius:theme:assets:install public
+bin/console ckeditor:install --clear=skip
+
+### Install node assets and build styles
+yarn install
+yarn build
+

@@ -1,0 +1,34 @@
+#!/bin/bash
+
+RED="\e[31m"
+GREEN="\e[32m"
+ENDCOLOR="\e[0m"
+
+if [ -d ".git" ]; then
+  echo -e "Remove ${RED}.git${ENDCOLOR} folder!!!"
+  exit 1
+fi
+
+BACKUP_DIR="${DDEV_APPROOT}/.ddev/backup"
+
+mkdir -p ${BACKUP_DIR}
+
+### Remove license file
+rm LICENSE
+
+### Backup files
+mv README.md ${BACKUP_DIR}/README.md
+mv .env.dev.local ${BACKUP_DIR}/.env.dev.local
+
+### Create sylius project
+ddev composer create sylius/sylius-standard
+
+### Move back backuped files
+mv ${BACKUP_DIR}/README.md ./README.md
+mv ${BACKUP_DIR}/.env.dev.local ./.env.dev.local
+
+### Install sylius
+ddev exec bin/console sylius:install
+
+### rebuild site
+ddev rebuild-site

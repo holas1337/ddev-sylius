@@ -1,0 +1,23 @@
+#!/bin/bash
+
+RED="\e[31m"
+GREEN="\e[32m"
+ENDCOLOR="\e[0m"
+
+echo -e "Import ${GREEN}media files${ENDCOLOR}"
+
+BACKUP_DIR="${DDEV_APPROOT}/.ddev/backup"
+
+now=$(date +"%Y_%m_%d_%H%M%S")
+if [ -d public/media ]; then
+    echo -e "Backed up your Current ${RED}public/media${ENDCOLOR} as ${RED}public/media-old_${now}${ENDCOLOR}"
+    mv public/media public/media-old_${now}
+fi
+
+if [ -f "${BACKUP_DIR}/media.tar.gz" ]; then
+    tar -zxf "${BACKUP_DIR}"/media.tar.gz -C public
+else
+    LAST_MEDIA_BACKUP=$(ls -t "${BACKUP_DIR}"/media_*.tar.gz | head -1)
+    echo -e "No media.tar.gz found, using ${LAST_MEDIA_BACKUP}"
+    tar -zxf "${LAST_MEDIA_BACKUP}" -C public
+fi

@@ -1,0 +1,8 @@
+#!/bin/bash
+
+
+# run `composer audit`
+composer audit
+
+# run `yarn audit`
+yarn audit

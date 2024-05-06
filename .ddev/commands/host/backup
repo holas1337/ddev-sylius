@@ -1,0 +1,55 @@
+#!/bin/bash
+
+RED="\e[31m"
+GREEN="\e[32m"
+ENDCOLOR="\e[0m"
+
+BACKUP_DIR="${DDEV_APPROOT}/.ddev/backup"
+
+now=$(date +"%Y_%m_%d_%H%M%S")
+
+mkdir -p ${BACKUP_DIR}
+
+bck_sql() {
+    ddev export-db --file=database.sql.gz
+    mv database.sql.gz ${BACKUP_DIR}/database_${now}.sql.gz
+}
+
+bck_files() {
+    cd public
+    tar -zcf ../media.tar.gz media/
+    cd ..
+    mv media.tar.gz ${BACKUP_DIR}/media_${now}.tar.gz
+}
+
+bck_both() {
+  $(bck_sql)
+  $(bck_files)
+}
+
+PS3="Choose backup type: "
+
+select OPT in SQL FILES BOTH
+do
+    case $OPT in
+        SQL)
+          echo -e "Backing up the ${GREEN}database${ENDCOLOR} to ${BACKUP_DIR}"
+          $(bck_sql)
+          break
+          ;;
+        FILES)
+          echo -e "Backing up the ${GREEN}files${ENDCOLOR} to ${BACKUP_DIR}"
+          $(bck_files)
+          break
+          ;;
+        BOTH)
+          echo -e "Backing up the ${GREEN}database${ENDCOLOR} and ${GREEN}files${ENDCOLOR} to ${BACKUP_DIR}"
+          $(bck_both)
+          break
+          ;;
+        *)
+          echo "Invalid option $REPLY"
+          break
+          ;;
+      esac
+done
