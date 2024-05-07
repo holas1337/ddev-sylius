@@ -58,3 +58,27 @@ ddev yarn install                                                     # install 
 ddev yarn build                                                       # build assets
 ddev yarn watch                                                       # watch assets
 ```
+
+# Xdebug
+enable in .ddev
+```bash
+ddev xdebug on
+```
+
+## PHPStorm
+When asked for mapping choose 
+```bash
+/var/www/html/index.php
+```
+
+If something is not working check if mappings `Settings \ PHP \ Servers` look like this:
+```
+project_dir (first folder in Project Files) -> /var/www/html
+prokect_dir/public                          -> /var/www/html/public
+```
+
+```
+host: sylius.ddev.site    # this might be different if you changed `.ddev/config` `name` or using additional hosts
+port: 8443
+```
+And now it should work
