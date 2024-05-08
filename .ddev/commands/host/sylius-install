@@ -9,12 +9,19 @@ if [ -d ".git" ]; then
   exit 1
 fi
 
+if [ -f "composer.json" ]; then
+  echo -e "Sylius already insalled or installation started and aborted. Do cleanup and start again."
+  exit 1
+fi
+
+if [ -f "LICENSE" ]; then
+  echo -e "Remove ${RED}LICENSE${ENDCOLOR} file!!!"
+  exit 1
+fi
+
 BACKUP_DIR="${DDEV_APPROOT}/.ddev/backup"
 
 mkdir -p ${BACKUP_DIR}
-
-### Remove license file
-rm LICENSE
 
 ### Backup files
 mv README.md ${BACKUP_DIR}/README.md
