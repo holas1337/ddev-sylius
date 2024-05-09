@@ -1,5 +1,7 @@
 # General information
-.ddev boilerplate code for quick Sylius setup
+DDEV boilerplate code for quick Sylius setup.
+
+Please treat is as na early alpha - version 0.1.
 
 # Local setup
 
