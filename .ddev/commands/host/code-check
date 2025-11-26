@@ -1,10 +1,12 @@
 #!/bin/bash
 
+set -euo pipefail
+
 RED="\e[31m"
 GREEN="\e[32m"
 ENDCOLOR="\e[0m"
 
-PHPVER=8.2
+PHPVER=8.4
 DIRECTORY="src tests"
 
 ### PHP CS standard=PHPCompatibility ###
@@ -12,12 +14,16 @@ echo -e "Running ${GREEN}PHP CS standard=PHPCompatibility ${PHPVER}${ENDCOLOR}"
 docker run --pull always --rm -ti -w "/project" -v `pwd`:/project droptica/compatibility:latest phpcs --ignore=*.js,*.css -p ${DIRECTORY} --standard=PHPCompatibility --runtime-set testVersion $PHPVER --report=code || true
 
 ### PHP CS Fixer
-echo -e "Running ${GREEN}PHP CS Fixer${ENDCOLOR}"
-docker run --pull always --rm -t -v `pwd`:/opt/project droptica/php-cs-fixer:latest php-cs-fixer fix --config=/opt/project/.php-cs-fixer.dist.php --verbose --diff --dry-run || true
+#echo -e "Running ${GREEN}PHP CS Fixer${ENDCOLOR}"
+#docker run --pull always --rm -t -v `pwd`:/opt/project droptica/php-cs-fixer:latest php-cs-fixer fix --config=/opt/project/.php-cs-fixer.dist.php --verbose --diff --dry-run || true
 
 ### EasyCodingStandard
 echo -e "Running ${GREEN}EasyCodingStandard${ENDCOLOR}"
 ddev exec vendor/bin/ecs check ${DIRECTORY}
+
+### Rector
+echo -e "Running ${GREEN}Rector (dry-run)${ENDCOLOR}"
+ddev exec vendor/bin/rector process --dry-run
 
 ### PHPStan
 echo -e "Running ${GREEN}PHPStan${ENDCOLOR}"

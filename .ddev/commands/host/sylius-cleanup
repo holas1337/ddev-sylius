@@ -1,0 +1,127 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+RED="\e[31m"
+GREEN="\e[32m"
+ENDCOLOR="\e[0m"
+
+# Minimal sylius-cleanup host command
+# Behavior: if a git repository exists in the project root, restore tracked files and remove untracked files.
+# Usage: ddev sylius-cleanup (run as a ddev host command so DDEV_APPROOT is set)
+
+if [ -z "${DDEV_APPROOT:-}" ]; then
+  printf "%b\n" "${RED}DDEV_APPROOT is not set. Run this as a ddev host command (e.g. 'ddev sylius-cleanup').${ENDCOLOR}"
+  exit 1
+fi
+
+# Safety: change to project root (allow / if set by DDEV)
+printf "%b\n" "${GREEN}Changing working directory to project root: ${DDEV_APPROOT}${ENDCOLOR}"
+if ! cd "${DDEV_APPROOT}"; then
+  printf "%b\n" "${RED}Failed to change directory to ${DDEV_APPROOT}. Aborting.${ENDCOLOR}"
+  exit 1
+fi
+
+# Parse args: only exact '--force' performs destructive actions; otherwise dry-run/info
+if [ "$#" -eq 1 ] && [ "$1" = "--force" ]; then
+  MODE="force"
+else
+  MODE="info"
+fi
+
+GIT_DIR="${DDEV_APPROOT}/.git"
+
+EXPECTED_REMOTE_SSH="git@github.com:holas1337/ddev-sylius.git"
+EXPECTED_REMOTE_HTTPS="https://github.com/holas1337/ddev-sylius.git"
+
+# If in info (default) mode, show what would happen and exit
+if [ "${MODE}" != "force" ]; then
+  if [ -d "${GIT_DIR}" ]; then
+    printf "%b\n" "${GREEN}Dry-run: A git repository exists at ${DDEV_APPROOT}.${ENDCOLOR}"
+
+    # detect origin remote for informational purposes
+    origin_raw=$(git -C "${DDEV_APPROOT}" remote get-url origin 2>/dev/null || true)
+    if [ -n "$origin_raw" ]; then
+      if [ "$origin_raw" = "$EXPECTED_REMOTE_SSH" ] || [ "$origin_raw" = "$EXPECTED_REMOTE_HTTPS" ]; then
+        printf "%b\n" "${GREEN}Detected origin: %s (matches expected remote)${ENDCOLOR}" "$origin_raw"
+      else
+        printf "%b\n" "${RED}Detected origin: %s (DOES NOT match expected: %s or %s)${ENDCOLOR}" "$origin_raw" "$EXPECTED_REMOTE_SSH" "$EXPECTED_REMOTE_HTTPS"
+      fi
+    else
+      printf "%b\n" "${RED}No 'origin' remote detected in this repository.${ENDCOLOR}"
+    fi
+
+    printf "%b\n" "${GREEN}Would run:${ENDCOLOR}"
+    printf "  - git -C %s restore -- .\n" "${DDEV_APPROOT}"
+    printf "  - git -C %s clean -fd\n" "${DDEV_APPROOT}"
+    printf "  - remove node_modules (if present)\n"
+  else
+    printf "%b\n" "${GREEN}Dry-run: No git repository detected at ${DDEV_APPROOT}; nothing would be done.${ENDCOLOR}"
+  fi
+  printf "%b\n" "${GREEN}To perform the cleanup, re-run this command with --force.${ENDCOLOR}"
+  exit 0
+fi
+
+# If no git repo is present, early return to avoid large nested blocks
+if [ ! -d "${GIT_DIR}" ]; then
+  printf "%b\n" "${GREEN}No git repository detected at ${DDEV_APPROOT}; nothing to do.${ENDCOLOR}"
+  printf "%b\n" "${GREEN}sylius-cleanup finished.${ENDCOLOR}"
+  exit 0
+fi
+
+# From here on we know .git exists; ensure git is available
+if ! command -v git >/dev/null 2>&1; then
+  printf "%b\n" "${RED}Git is not available in PATH. Cannot perform restore/clean.${ENDCOLOR}"
+  exit 1
+fi
+
+# Verify repository origin matches the expected upstream before making destructive changes
+origin_raw=$(git -C "${DDEV_APPROOT}" remote get-url origin 2>/dev/null || true)
+if [ -z "$origin_raw" ]; then
+  printf "%b\n" "${RED}No 'origin' remote detected. Aborting to avoid operating on an unexpected repo.${ENDCOLOR}"
+  exit 1
+fi
+if [ "$origin_raw" != "$EXPECTED_REMOTE_SSH" ] && [ "$origin_raw" != "$EXPECTED_REMOTE_HTTPS" ]; then
+  printf "%b\n" "${RED}Repository origin mismatch:${ENDCOLOR}"
+  printf "  Detected: %s\n" "$origin_raw"
+  printf "  Expected (SSH or HTTPS): %s or %s\n" "$EXPECTED_REMOTE_SSH" "$EXPECTED_REMOTE_HTTPS"
+  printf "%b\n" "${RED}Aborting to avoid destructive operations on the wrong repository.${ENDCOLOR}"
+  exit 1
+fi
+
+printf "%b\n" "${GREEN}Git repository detected at ${DDEV_APPROOT}. Restoring tracked files and cleaning untracked files...${ENDCOLOR}"
+
+# Restore tracked files to HEAD
+if git -C "${DDEV_APPROOT}" restore -- .; then
+  printf "%b\n" "${GREEN}git restore completed.${ENDCOLOR}"
+else
+  printf "%b\n" "${RED}git restore failed. Aborting.${ENDCOLOR}"
+  exit 1
+fi
+
+# Remove untracked files and directories
+if git -C "${DDEV_APPROOT}" clean -fd; then
+  printf "%b\n" "${GREEN}git clean -fd completed (untracked files removed).${ENDCOLOR}"
+else
+  printf "%b\n" "${RED}git clean -fd failed. Aborting.${ENDCOLOR}"
+  exit 1
+fi
+
+# Remove node_modules if present
+if [ -e "${DDEV_APPROOT}/node_modules" ]; then
+  printf "%b\n" "${GREEN}Found node_modules at ${DDEV_APPROOT}/node_modules; removing...${ENDCOLOR}"
+  if rm -rf -- "${DDEV_APPROOT}/node_modules"; then
+    printf "%b\n" "${GREEN}node_modules removed.${ENDCOLOR}"
+  else
+    printf "%b\n" "${RED}Failed to remove node_modules. Aborting.${ENDCOLOR}"
+    exit 1
+  fi
+else
+  printf "%b\n" "${GREEN}No node_modules directory found; skipping.${ENDCOLOR}"
+fi
+
+# Stop ddev and remove project data (omit snapshot)
+printf "%b\n" "${GREEN}To finish the cleanup and remove ddev containers & project data, run:${ENDCOLOR}"
+printf "  ddev stop --remove-data --omit-snapshot\n"
+printf "%b\n" "${GREEN}Note: this command is not run automatically by this script.${ENDCOLOR}"
+
+printf "%b\n" "${GREEN}sylius-cleanup finished.${ENDCOLOR}"
