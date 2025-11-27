@@ -1,0 +1,6 @@
+### Ignore IDE specific files
+.idea
+
+### Ignore OS generated files
+.DS_Store
+Thumbs.db

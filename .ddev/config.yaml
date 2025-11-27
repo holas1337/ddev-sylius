@@ -1,14 +1,14 @@
-name: sylius
+name: ddev-sylius-boilerplate
 type: php
 docroot: public
-php_version: "8.2"
+php_version: "8.4"
 webserver_type: apache-fpm
 xdebug_enabled: false
 additional_hostnames: []
 additional_fqdns: []
 database:
     type: mariadb
-    version: "10.11"
+    version: "11.4"
 use_dns_when_possible: true
 composer_version: "2"
 web_environment: []
