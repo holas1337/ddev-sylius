@@ -31,6 +31,24 @@ or rebuild without touching DB and Media
 ddev rebuild-site
 ```
 
+## Start a new project using this boilerplate
+Adjust the name of the project in .ddev/config.yaml file, then run:
+```bash
+ddev start
+ddev sylius-install
+rm -rf .git
+git init
+git add .
+git commit -m "Initial commit"
+```
+
+Set remote, push code....
+
+Additionally, you can remove DDEV commands
+- .ddev/commands/host/sylius-install
+- .ddev/commands/host/sylius-cleanup
+They are useful only for initial setup.
+
 ## Commands
 
 ### ddev
@@ -64,3 +82,18 @@ ddev yarn install                                                     # install 
 ddev yarn build                                                       # build assets
 ddev yarn watch                                                       # watch assets
 ```
+
+
+# Additional information
+
+## Compatibility
+This boilerplate was tested on:
+- Windows 11 with WSL2 (Ubuntu 24.04) + Docker Desktop
+- [To Do] macOS Tahoe (Apple Silicon) + Docker Desktop 
+
+Should work without a problem on Linux with Docker as well.
+
+## [To Do] macOS specifics
+Need to properly set
+- `upload_dirs` in .ddev/config.yaml to avoid issues with media uploads
+- mutagen ignore sync for better performance
