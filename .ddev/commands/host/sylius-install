@@ -5,19 +5,51 @@ RED="\e[31m"
 GREEN="\e[32m"
 ENDCOLOR="\e[0m"
 
-if [ -n "${1:-}" ]; then
-  SYLIUS_VERSION="$1"
-else
-  printf "%b\n" "${GREEN}No Sylius version parameter provided.${ENDCOLOR}"
+# Parse arguments: version and/or --no-interaction flag
+SYLIUS_VERSION=""
+NO_INTERACTION_FLAG_PROVIDED=false
+
+for arg in "$@"; do
+  if [ "$arg" = "--no-interaction" ]; then
+    NO_INTERACTION_FLAG_PROVIDED=true
+  else
+    # Assume it's the version
+    SYLIUS_VERSION="$arg"
+  fi
+done
+
+# If version not provided as argument, ask for it
+if [ -z "${SYLIUS_VERSION}" ]; then
   printf "%b\n" "${GREEN}Enter Sylius version to install (e.g. '^2.1' or '2.1.3') or press Enter for newest:${ENDCOLOR}"
   read -r -p "> " USER_SYLIUS_VERSION
   if [ -z "${USER_SYLIUS_VERSION}" ]; then
-    # Empty means install the newest available (omit version in composer)
     SYLIUS_VERSION=""
     printf "%b\n" "${GREEN}Installing newest Sylius version.${ENDCOLOR}"
   else
     SYLIUS_VERSION="${USER_SYLIUS_VERSION}"
     printf "%b\n" "${GREEN}Installing Sylius version: ${SYLIUS_VERSION}${ENDCOLOR}"
+  fi
+else
+  if [ -n "${SYLIUS_VERSION}" ]; then
+    printf "%b\n" "${GREEN}Installing Sylius version: ${SYLIUS_VERSION}${ENDCOLOR}"
+  else
+    printf "%b\n" "${GREEN}Installing newest Sylius version.${ENDCOLOR}"
+  fi
+fi
+
+# If --no-interaction not provided as flag, ask for interactive mode preference
+if [ "$NO_INTERACTION_FLAG_PROVIDED" = true ]; then
+  INTERACTIVE_FLAG="--no-interaction"
+  printf "%b\n" "${GREEN}Using non-interactive mode.${ENDCOLOR}"
+else
+  printf "%b\n" "${GREEN}Use interactive mode for Sylius installation? (Yes/No, default: No):${ENDCOLOR}"
+  read -r -p "> " USER_INTERACTIVE_MODE
+  if [[ "${USER_INTERACTIVE_MODE}" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+    INTERACTIVE_FLAG=""
+    printf "%b\n" "${GREEN}Using interactive mode.${ENDCOLOR}"
+  else
+    INTERACTIVE_FLAG="--no-interaction"
+    printf "%b\n" "${GREEN}Using non-interactive mode (default).${ENDCOLOR}"
   fi
 fi
 
@@ -28,8 +60,10 @@ if [ -z "${DDEV_APPROOT:-}" ]; then
 fi
 
 DDEV_APP_FILES_DIR="${DDEV_APPROOT}/.ddev/_files"
-APP_DIR="${DDEV_APPROOT}/App"
-APP_SUBDIR="App"
+
+# Use container temp directory to avoid mutagen sync issues
+CONTAINER_TEMP_DIR="/tmp/sylius-install-$$"
+CONTAINER_WEBROOT="/var/www/html"
 
 # Ensure ddev is available on the host
 if ! command -v ddev >/dev/null 2>&1; then
@@ -42,34 +76,7 @@ if [ -f "${DDEV_APPROOT}/composer.json" ]; then
   exit 1
 fi
 
-### Creating required directories
-mkdir -p "${APP_DIR}"
-
-### Create sylius project (run composer inside the web container, target current dir '.')
-if [ -n "${SYLIUS_VERSION}" ]; then
-  printf "%b\n" "${GREEN}Creating Sylius project (version ${SYLIUS_VERSION}) in ${APP_DIR}...${ENDCOLOR}"
-  CREATE_CMD="cd ${APP_SUBDIR} && composer create-project sylius/sylius-standard . '${SYLIUS_VERSION}' --no-interaction --no-scripts"
-else
-  printf "%b\n" "${GREEN}Creating Sylius project (newest) in ${APP_DIR}...${ENDCOLOR}"
-  CREATE_CMD="cd ${APP_SUBDIR} && composer create-project sylius/sylius-standard . --no-interaction --no-scripts"
-fi
-# Create the project inside the web container but install into the current directory ('.') to avoid unsupported subdirectory errors.
-if ! ddev exec "${CREATE_CMD}"; then
-  printf "%b\n" "${RED}Composer create-project failed. Aborting.${ENDCOLOR}"
-  exit 1
-fi
-
-### Copy ddev .env.dev.local if it exists
-if [ -f "${DDEV_APP_FILES_DIR}/.env.dev.local" ]; then
-  printf "%b\n" "${GREEN}Restoring .env.dev.local to project...${ENDCOLOR}"
-  if ! cp -v "${DDEV_APP_FILES_DIR}/.env.dev.local" "${APP_DIR}/.env.dev.local"; then
-    printf "%b\n" "${RED}Failed to copy .env.dev.local. You may need to restore it manually.${ENDCOLOR}"
-  fi
-else
-  printf "%b\n" "${GREEN}No .env.dev.local backup found in ${DDEV_APP_FILES_DIR} — skipping restore.${ENDCOLOR}"
-fi
-
-### Rename README.md and LICENSE files to avoid conflicts
+### Rename README.md and LICENSE files on host to avoid conflicts (do this first)
 if [ -f "${DDEV_APPROOT}/README.md" ]; then
   printf "%b\n" "${GREEN}Renaming README.md to README-ddev-sylius.md to avoid conflicts...${ENDCOLOR}"
   mv "${DDEV_APPROOT}/README.md" "${DDEV_APPROOT}/README-ddev-sylius.md"
@@ -80,29 +87,50 @@ if [ -f "${DDEV_APPROOT}/LICENSE" ]; then
   mv "${DDEV_APPROOT}/LICENSE" "${DDEV_APPROOT}/LICENSE-ddev-sylius"
 fi
 
-sleep 10;
-
-### Move App contents to DDEV_APPROOT
-# Use copy-then-remove to avoid "Device or resource busy" problems with mv across mounts
-printf "%b\n" "${GREEN}Moving Sylius App contents to ${DDEV_APPROOT}...${ENDCOLOR}"
-if cp -a "${APP_DIR}/." "${DDEV_APPROOT}/"; then
-  printf "%b\n" "${GREEN}Copied Sylius App contents to ${DDEV_APPROOT}.${ENDCOLOR}"
-  printf "%b\n" "${GREEN}Removing temporary App directory at ${APP_DIR}...${ENDCOLOR}"
-  if rm -rf "${APP_DIR:?}"; then
-    printf "%b\n" "${GREEN}Removed temporary App directory.${ENDCOLOR}"
-  else
-    printf "%b\n" "${RED}Failed to remove temporary App directory at ${APP_DIR}. Please remove it manually.${ENDCOLOR}"
-  fi
+### Create sylius project inside container temp directory (avoids mutagen sync issues)
+if [ -n "${SYLIUS_VERSION}" ]; then
+  printf "%b\n" "${GREEN}Creating Sylius project (version ${SYLIUS_VERSION}) in container...${ENDCOLOR}"
+  CREATE_CMD="mkdir -p ${CONTAINER_TEMP_DIR} && cd ${CONTAINER_TEMP_DIR} && composer create-project sylius/sylius-standard . '${SYLIUS_VERSION}' --no-interaction --no-scripts"
 else
-  printf "%b\n" "${RED}Failed to copy Sylius App contents to ${DDEV_APPROOT}. Aborting.${ENDCOLOR}"
-  printf "%b\n" "${RED}Sylius installation incomplete. Run ddev sylius-cleanup and start again.${ENDCOLOR}"
+  printf "%b\n" "${GREEN}Creating Sylius project (newest) in container...${ENDCOLOR}"
+  CREATE_CMD="mkdir -p ${CONTAINER_TEMP_DIR} && cd ${CONTAINER_TEMP_DIR} && composer create-project sylius/sylius-standard . --no-interaction --no-scripts"
+fi
+
+if ! ddev exec "${CREATE_CMD}"; then
+  printf "%b\n" "${RED}Composer create-project failed. Aborting.${ENDCOLOR}"
+  ddev exec "rm -rf ${CONTAINER_TEMP_DIR}" 2>/dev/null || true
   exit 1
 fi
 
-### Install sylius (non-interactive)
-printf "%b\n" "${GREEN}Running Sylius installer (non-interactive)...${ENDCOLOR}"
-# Run installer inside the web container. Use `cd App` to reach the created project.
-if ! ddev exec bin/console sylius:install --no-interaction; then
+### Copy ddev .env.dev.local if it exists (copy into container)
+if [ -f "${DDEV_APP_FILES_DIR}/.env.dev.local" ]; then
+  printf "%b\n" "${GREEN}Restoring .env.dev.local to project...${ENDCOLOR}"
+  if ! ddev exec "cp -v ${CONTAINER_WEBROOT}/.ddev/_files/.env.dev.local ${CONTAINER_TEMP_DIR}/.env.dev.local"; then
+    printf "%b\n" "${RED}Failed to copy .env.dev.local. You may need to restore it manually.${ENDCOLOR}"
+  fi
+else
+  printf "%b\n" "${GREEN}No .env.dev.local backup found in ${DDEV_APP_FILES_DIR} — skipping restore.${ENDCOLOR}"
+fi
+
+### Move files from temp directory to webroot (all inside container - no sync delays!)
+printf "%b\n" "${GREEN}Moving Sylius files to webroot inside container...${ENDCOLOR}"
+MOVE_CMD="shopt -s dotglob && cp -af ${CONTAINER_TEMP_DIR}/* ${CONTAINER_WEBROOT}/ && rm -rf ${CONTAINER_TEMP_DIR}"
+if ! ddev exec bash -c "${MOVE_CMD}"; then
+  printf "%b\n" "${RED}Failed to move Sylius files to webroot. Aborting.${ENDCOLOR}"
+  printf "%b\n" "${RED}Sylius installation incomplete. Run ddev sylius-cleanup and start again.${ENDCOLOR}"
+  ddev exec "rm -rf ${CONTAINER_TEMP_DIR}" 2>/dev/null || true
+  exit 1
+fi
+
+printf "%b\n" "${GREEN}Sylius files successfully installed in webroot.${ENDCOLOR}"
+
+### Install sylius
+if [ -n "${INTERACTIVE_FLAG}" ]; then
+  printf "%b\n" "${GREEN}Running Sylius installer (non-interactive)...${ENDCOLOR}"
+else
+  printf "%b\n" "${GREEN}Running Sylius installer (interactive)...${ENDCOLOR}"
+fi
+if ! ddev exec bin/console sylius:install ${INTERACTIVE_FLAG}; then
   printf "%b\n" "${RED}Sylius installer failed. Check the container output for details.${ENDCOLOR}"
   exit 1
 fi

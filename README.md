@@ -1,8 +1,6 @@
 # General information
 DDEV boilerplate code for quick Sylius setup.
 
-Please treat is as an early alpha - version 0.1.
-
 # Local setup
 
 ```bash
@@ -20,7 +18,7 @@ ddev backup
 ddev sylius-cleanup
 ```
 
-## Build from backup
+## Build from backupa
 Build the project
 ```bash
 ddev build-site
@@ -31,7 +29,7 @@ or rebuild without touching DB and Media
 ddev rebuild-site
 ```
 
-## Start a new project using this boilerplate
+# Start a new project using this boilerplate
 Adjust the name of the project in .ddev/config.yaml file, then run:
 ```bash
 ddev start
@@ -47,11 +45,12 @@ Set remote, push code....
 Additionally, you can remove DDEV commands
 - .ddev/commands/host/sylius-install
 - .ddev/commands/host/sylius-cleanup
+
 They are useful only for initial setup.
 
-## Commands
+# Commands
 
-### ddev
+## ddev
 ```bash
 ddev cc                 # clear all cache (Symfony and Doctrine)
 ddev dist               # install Sylius assets, install yarn assets and build them
@@ -62,12 +61,12 @@ ddev files-import       # import media
 ddev code-check         # run Coding standards checks
 ```
 
-### Composer
+## Composer
 ```bash
 ddev composer <params>
 ```
 
-### Symfony
+## Symfony
 ```bash
 ddev exec bin/console <COMMAND>
 ddev exec bin/console about                                           # show Symfony about information
@@ -75,7 +74,7 @@ ddev exec bin/console doctrine:migrations:migrate                     # run all 
 ddev exec bin/console doctrine:migrations:diff                        # create new migration
 ```
 
-### Yarn
+## Yarn
 ```bash
 ddev yarn <param>
 ddev yarn install                                                     # install all dependencies
@@ -83,17 +82,28 @@ ddev yarn build                                                       # build as
 ddev yarn watch                                                       # watch assets
 ```
 
+# macOS optimizations
+This can be done to improve performance on macOS hosts.
+
+## uoload_dirs
+Add `upload_dirs` to `.ddev/config.yaml`
+```yaml
+upload_dirs:
+    - media
+    - ../node_modules
+    - ../.ddev/backup
+```
+
+## Mutagen
+https://docs.ddev.com/en/stable/users/install/performance/#advanced-mutagen-configuration-options
+
+For better performacne we can for example add to `sync.defaults.ignore.paths` the Symfony `var/cache`.
 
 # Additional information
 
 ## Compatibility
 This boilerplate was tested on:
 - Windows 11 with WSL2 (Ubuntu 24.04) + Docker Desktop
-- [To Do] macOS Tahoe (Apple Silicon) + Docker Desktop 
+- macOS Tahoe (Apple Silicon) + Docker Desktop
 
 Should work without a problem on Linux with Docker as well.
-
-## [To Do] macOS specifics
-Need to properly set
-- `upload_dirs` in .ddev/config.yaml to avoid issues with media uploads
-- mutagen ignore sync for better performance
